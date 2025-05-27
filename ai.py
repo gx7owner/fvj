@@ -7,7 +7,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Messa
 
 # ======= CONFIGURATION =======
 TELEGRAM_TOKEN = '8189253029:AAGQc5hjp0fiZ7qNCeH2b4jjCXhWAkLSCc0'
-HUGGINGFACE_API_KEY = 'your-huggingface-api-key'
+HUGGINGFACE_API_KEY = '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'
 ADMIN_USER_ID = 7792814115  # Replace with your Telegram user ID
 MODEL = "mistralai/Mistral-7B-Instruct-v0.1"
 USER_FILE = "users.json"
