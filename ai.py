@@ -1,20 +1,21 @@
 import logging
-import openai
+import json
+import os
+import requests
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, filters
-import os
-import json
 
-# Replace with your tokens
+# ======= CONFIGURATION =======
 TELEGRAM_TOKEN = '8189253029:AAGQc5hjp0fiZ7qNCeH2b4jjCXhWAkLSCc0'
-OPENAI_API_KEY = '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'
+HUGGINGFACE_API_KEY = 'your-huggingface-api-key'
 ADMIN_USER_ID = 7792814115  # Replace with your Telegram user ID
+MODEL = "mistralai/Mistral-7B-Instruct-v0.1"
+USER_FILE = "users.json"
+# =============================
 
-openai.api_key = OPENAI_API_KEY
 logging.basicConfig(level=logging.INFO)
 
-USER_FILE = "users.json"
-
+# Load/save users
 def load_users():
     if os.path.exists(USER_FILE):
         with open(USER_FILE, "r") as f:
@@ -25,24 +26,41 @@ def save_users(user_ids):
     with open(USER_FILE, "w") as f:
         json.dump(list(user_ids), f)
 
-# Track user IDs
 user_ids = load_users()
 
-async def ai_reply(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# AI from Hugging Face
+def ask_ai(prompt):
+    headers = {"Authorization": f"Bearer {HUGGINGFACE_API_KEY}"}
+    json_data = {"inputs": prompt, "parameters": {"max_new_tokens": 100}}
+    response = requests.post(
+        f"https://api-inference.huggingface.co/models/{MODEL}",
+        headers=headers,
+        json=json_data
+    )
+    try:
+        result = response.json()
+        return result[0]["generated_text"]
+    except Exception:
+        return "Sorry, I couldn't process that."
+
+# /start command
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.effective_user.id
+    user_ids.add(user_id)
+    save_users(user_ids)
+    await update.message.reply_text(
+        "Welcome! I'm your AI assistant. Just type your message and I'll reply. "
+        "You can also ask me to generate simple code files!"
+    )
+
+# Handle all user messages
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     user_ids.add(user_id)
     save_users(user_ids)
 
     user_message = update.message.text
-    try:
-        response = openai.ChatCompletion.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": user_message}]
-        )
-        reply = response.choices[0].message['content']
-    except Exception as e:
-        reply = f"Error: {e}"
-
+    reply = ask_ai(user_message)
     await update.message.reply_text(reply)
 
 # Admin broadcast command
@@ -67,11 +85,12 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"Broadcast sent to {count} users.")
 
+# Main
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, ai_reply))
+    app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("broadcast", broadcast))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     print("Bot is running...")
     app.run_polling()
